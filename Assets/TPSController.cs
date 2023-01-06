@@ -2,10 +2,14 @@ using Microsoft.Win32.SafeHandles;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Events;
 using Quaternion = UnityEngine.Quaternion;
 
 public class TPSController : MonoBehaviour
 {
+    [SerializeField] UnityEvent OnSprint = new UnityEvent();
+
     Rigidbody m_rigidbody;
     [SerializeField] Transform viewPoint;
     Transform horizontalCam;
@@ -14,6 +18,8 @@ public class TPSController : MonoBehaviour
     [SerializeField] float turnSpeed;
     float turnTime = 0;
     float dirRotVel = 0;
+    float inputHorizontal;
+    float inputVertical;
     [SerializeField] float JumpSpeed = 10;
     [SerializeField] Transform dirIndicator;
     [SerializeField] Transform baseSpine;
@@ -31,6 +37,7 @@ public class TPSController : MonoBehaviour
     float distToGround;
     [SerializeField] bool showCursor = true;
     bool preShowCursor = true;
+    [SerializeField] GameObject Ball;
     // Start is called before the first frame update
     void Start()
     {
@@ -46,13 +53,22 @@ public class TPSController : MonoBehaviour
     void Update()
     {
         MouseLook();
+        inputHorizontal = 0f;
+        inputVertical = 0f; 
         if (IsGrounded())
         {
-            Locomotion();
-            if (Input.GetKeyDown(KeyCode.Space))
+
+            if (!animator.GetCurrentAnimatorStateInfo(1).IsName("Dance"))
             {
-                JumpInput();
+                LocomotionInput();
+
+                if (Input.GetAxis("LeftTrigger") > 0.1)
+                {
+                    JumpInput();
+                }
             }
+            Locomotion();
+
         }
         AnimatorStateInfo stateinfo = animator.GetCurrentAnimatorStateInfo(1);
         if (stateinfo.IsName("Jump")) animator.SetBool("Jump", false);
@@ -71,12 +87,12 @@ public class TPSController : MonoBehaviour
         
         //animator2次元空間ブレンド向けの処理
         //モデルから見たdirの座標を取得
-        Vector3 relate = model.transform.InverseTransformPoint(transform.position + direction * (noVerticalVelocity.magnitude / baseSpeed));
+        Vector3 relate = model.transform.InverseTransformPoint(transform.position + direction * (noVerticalVelocity.magnitude / baseSpeed))/4;
         //animatorに適用
-        animator.SetFloat("Horizontal", relate.x);
-        animator.SetFloat("Vertical", relate.z);
+        animator.SetFloat("Horizontal", relate.x * (1 + Input.GetAxis("RightTrigger")));
+        animator.SetFloat("Vertical", relate.z * (1 + Input.GetAxis("RightTrigger")));
 
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetAxis("LeftBumper") > 0.1)
         {
             ShotInput();
         }
@@ -99,8 +115,8 @@ public class TPSController : MonoBehaviour
     void MouseLook()
     {
         showCursor = false;
-        float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime * 200 * Settings.MouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * Time.deltaTime * 200 * Settings.MouseSensitivity;
+        float mouseY = Input.GetAxis("LeftHoirizontal") * Time.deltaTime * 200 * Settings.MouseSensitivity;
+        float mouseX = Input.GetAxis("LeftVertical") * Time.deltaTime * 200 * Settings.MouseSensitivity;
         if (mouseX >= 0.001)
         {
             Debug.Log(mouseX);
@@ -120,10 +136,15 @@ public class TPSController : MonoBehaviour
 
     }
 
+    void LocomotionInput()
+    {
+        inputHorizontal = Input.GetAxis("Horizontal");
+        inputVertical = Input.GetAxis("Vertical");
+    }
+
     void Locomotion()
     {
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
+        
 
         horizontalCam.position = Camera.main.transform.position;
 
@@ -134,7 +155,7 @@ public class TPSController : MonoBehaviour
         forward.Normalize();
         right.Normalize();
 
-        targetVelocity = (right * horizontal + forward * vertical).normalized * baseSpeed;
+        targetVelocity = (right * inputHorizontal + forward * inputVertical).normalized * baseSpeed * (1 + Input.GetAxis("RightTrigger"));
         targetVelocity.y = m_rigidbody.velocity.y;
 
         if (targetVelocity.magnitude <= 0.001)
@@ -156,6 +177,11 @@ public class TPSController : MonoBehaviour
 
         preTargetVelocity = targetVelocity;
 
+        //Debug.Log(Input.GetAxis("RightTrigger"));
+        if (Input.GetAxis("RightTrigger") > 0.1)
+        {
+            OnSprint.Invoke();
+        }
         //dirIndicator.position = transform.position;
         //dirIndicator.position += velocity;
         //transform.Translate(velocity * Time.deltaTime);
@@ -177,9 +203,15 @@ public class TPSController : MonoBehaviour
 
     public void Shot()
     {
-        Transform bullet = Instantiate(bulletPrefab).transform;
-        bullet.position = shorOrigin.position;
-        bullet.rotation = shorOrigin.rotation;
-        bullet.GetComponent<projectile>().Throw();
+        //Transform bullet = Instantiate(bulletPrefab).transform;
+        //bullet.position = shorOrigin.position;
+        //bullet.rotation = shorOrigin.rotation;
+        //bullet.GetComponent<projectile>().Throw();
+        Ball.GetComponent<BallController>().Throw(shorOrigin.rotation);
+    }
+
+    public void Dance()
+    {
+        animator.SetTrigger("Dance");
     }
 }
