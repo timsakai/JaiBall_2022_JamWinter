@@ -27373,7 +27373,7 @@ MonoBehaviour:
     parentPath: 
   originalIkData: []
   selectionData: []
-  lastSelectAnimationClip: {fileID: 7400000, guid: 4c00f8a2bce02774c9f65d53c5cec900, type: 2}
+  lastSelectAnimationClip: {fileID: 7400000, guid: a002547cf3207124fb009104077a4a87, type: 2}
   handPoseList: []
   blendShapeList: []
 --- !u!895512359 &1523641532
@@ -29070,6 +29070,10 @@ PrefabInstance:
       propertyPath: dirIndicator
       value: 
       objectReference: {fileID: 82196637}
+    - target: {fileID: 6280961099779890063, guid: 05ef0364ddc4cd441a4f7d11df760c09, type: 3}
+      propertyPath: groundLayer.m_Bits
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6280961099779890063, guid: 05ef0364ddc4cd441a4f7d11df760c09, type: 3}
       propertyPath: smoothedDirIndicator
       value: 

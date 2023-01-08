@@ -11,6 +11,7 @@ public class TPSController : MonoBehaviour
 {
     [SerializeField] UnityEvent OnSprint = new UnityEvent();
     [SerializeField] UnityEvent OnRaiseToTHrow = new UnityEvent();
+    [SerializeField] UnityEvent OnStandStill = new UnityEvent();
 
     Rigidbody m_rigidbody;
     [SerializeField] Transform viewPoint;
@@ -24,11 +25,16 @@ public class TPSController : MonoBehaviour
     float inputHorizontal;
     float inputVertical;
     [SerializeField] float JumpSpeed = 10;
+    bool isJumping = false;
+    bool isFalling = true;
+    [SerializeField] LayerMask groundLayer;
     [SerializeField] Transform dirIndicator;
     [SerializeField] Transform smoothedDirIndicator;
     [SerializeField] Transform baseSpine;
     [SerializeField] GameObject model;
     [SerializeField] Transform shorOrigin;
+    [SerializeField] float onJumpShootLavDisableTime;
+    float jumpTime = 0f;
     bool isRaiseToThrow = false;
     [SerializeField] GameObject bulletPrefab;
     Animator animator;
@@ -92,9 +98,30 @@ public class TPSController : MonoBehaviour
             Locomotion();
 
         }
-        AnimatorStateInfo stateinfo = animator.GetCurrentAnimatorStateInfo(1);
-        if (stateinfo.IsName("Jump")) animator.SetBool("Jump", false);
 
+        //AnimatorStateInfo stateinfo = animator.GetCurrentAnimatorStateInfo(1);
+        //if (stateinfo.IsName("JumpUp")) animator.SetBool("Jump", false);
+        if (m_rigidbody.velocity.y < -0.05f)
+        {
+            isFalling = true;
+        }
+        if (isJumping)
+        {
+            jumpTime += Time.deltaTime;
+            if(isFalling)
+            {
+                animator.SetTrigger("JumpDown");
+            }
+            //RaycastHit hit;
+            //if (Physics.Raycast(m_rigidbody.position,new Vector3(0,m_rigidbody.velocity.y,0),out hit, m_rigidbody.velocity.y,groundLayer))
+            //{
+                
+            //}
+        }
+        else
+        {
+            jumpTime = 0;
+        }
 
         Vector3 noVerticalVelocity = m_rigidbody.velocity;
         noVerticalVelocity.y = 0;
@@ -119,8 +146,18 @@ public class TPSController : MonoBehaviour
 
         //stateinfo = animator.GetCurrentAnimatorStateInfo(2);
         //if (stateinfo.IsName("Shoot")) animator.SetBool("Shoot", false);
+        m_rigidbody.drag = 0;
         if (Input.GetAxis("LeftBumper") > 0.1f)
         {
+            if (jumpTime >= onJumpShootLavDisableTime)
+            {
+                if (!isRaiseToThrow)
+                {
+                    m_rigidbody.velocity = new Vector3(m_rigidbody.velocity.x, 1f, m_rigidbody.velocity.z);
+                }
+                m_rigidbody.drag = 3;
+            }
+            //m_rigidbody.AddForce(Physics.gravity / 2 * Time.deltaTime, ForceMode.Force);
             isRaiseToThrow = true;
             animator.SetBool("RaiseToThrow", true);
             OnRaiseToTHrow.Invoke();
@@ -191,6 +228,10 @@ public class TPSController : MonoBehaviour
             inputVertical = 1;
             OnSprint.Invoke();
         }
+        if (Mathf.Abs(inputHorizontal) <= 0.05f && Mathf.Abs(inputVertical) <= 0.05f)
+        {
+            OnStandStill.Invoke();
+        }
     }
 
     void Locomotion()
@@ -242,10 +283,13 @@ public class TPSController : MonoBehaviour
     }
     void JumpInput()
     {
-        animator.SetBool("Jump",true);
+        if (!isJumping) animator.SetTrigger("Jump");
+        isJumping = true;
+
     }
     public void Jump()
     {
+        animator.ResetTrigger("Jump");
         m_rigidbody.AddForce(Vector3.up * JumpSpeed, ForceMode.Impulse);
     }
 
@@ -261,6 +305,7 @@ public class TPSController : MonoBehaviour
         //bullet.position = shorOrigin.position;
         //bullet.rotation = shorOrigin.rotation;
         //bullet.GetComponent<projectile>().Throw();
+        //m_rigidbody.useGravity = true;
         animator.SetBool("Shoot", false);
         Ball.GetComponent<BallController>().Throw(shorOrigin.rotation);
     }
@@ -268,5 +313,17 @@ public class TPSController : MonoBehaviour
     public void Dance()
     {
         animator.SetTrigger("Dance");
+    }
+
+    public void OnGround()
+    {
+        if (isFalling)
+        {
+            animator.ResetTrigger("JumpDown");
+            animator.ResetTrigger("Jump");
+            Debug.Log("Ground!");
+            isJumping = false;
+            isFalling = false;
+        }
     }
 }
