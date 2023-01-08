@@ -1,3 +1,4 @@
+using Cinemachine.Utility;
 using Microsoft.Win32.SafeHandles;
 using System.Collections;
 using System.Collections.Generic;
@@ -9,9 +10,11 @@ using Quaternion = UnityEngine.Quaternion;
 public class TPSController : MonoBehaviour
 {
     [SerializeField] UnityEvent OnSprint = new UnityEvent();
+    [SerializeField] UnityEvent OnRaiseToTHrow = new UnityEvent();
 
     Rigidbody m_rigidbody;
     [SerializeField] Transform viewPoint;
+    AimConstraint viewPointConstraint;
     Transform horizontalCam;
     Vector2 polarViewCoord = new Vector2();
     [SerializeField] float baseSpeed = 5;
@@ -22,15 +25,18 @@ public class TPSController : MonoBehaviour
     float inputVertical;
     [SerializeField] float JumpSpeed = 10;
     [SerializeField] Transform dirIndicator;
+    [SerializeField] Transform smoothedDirIndicator;
     [SerializeField] Transform baseSpine;
     [SerializeField] GameObject model;
     [SerializeField] Transform shorOrigin;
+    bool isRaiseToThrow = false;
     [SerializeField] GameObject bulletPrefab;
     Animator animator;
     //Vector3 dirRotVel = new Vector3();
     Vector3 velocity;
     Vector3 preTargetVelocity;
     Vector3 targetVelocity;
+    //[SerializeField] Transform targetDirectionTransform;
     Vector3 velocitySmoothCurrentVel;
     Vector3 direction;
     Collider m_collider;
@@ -38,6 +44,9 @@ public class TPSController : MonoBehaviour
     [SerializeField] bool showCursor = true;
     bool preShowCursor = true;
     [SerializeField] GameObject Ball;
+
+    [SerializeField] bool targeting;
+    public GameObject target;
     // Start is called before the first frame update
     void Start()
     {
@@ -47,12 +56,25 @@ public class TPSController : MonoBehaviour
         animator = model.GetComponent<Animator>();
         distToGround = m_collider.bounds.extents.y;
         //Debug.Log(m_collider.bounds.center);
+
+        viewPointConstraint = viewPoint.GetComponent<AimConstraint>();
+        ConstraintSource source = new ConstraintSource();
+        source.weight = 1;
+        source.sourceTransform = target.transform;
+        viewPointConstraint.SetSource(0, source);
     }
 
     // Update is called once per frame
     void Update()
     {
-        MouseLook();
+        if (targeting)
+        {
+            TargetLook();
+        }
+        else
+        {
+            MouseLook();
+        }
         inputHorizontal = 0f;
         inputVertical = 0f; 
         if (IsGrounded())
@@ -81,10 +103,10 @@ public class TPSController : MonoBehaviour
             direction = noVerticalVelocity;
         }
         //dirの角度を求める
-        float dir_angle = Mathf.Rad2Deg * Mathf.Atan2(direction.x, direction.z);
+        //float dir_angle = Mathf.Rad2Deg * Mathf.Atan2(direction.x, direction.z);
         //modelのオイラー角を設定(yのみ、スムース)
-        model.transform.eulerAngles = new Vector3(0,Mathf.SmoothDampAngle(model.transform.rotation.eulerAngles.y, dir_angle,ref dirRotVel, 0.5f) , 0);
-        
+        //model.transform.eulerAngles = new Vector3(0,Mathf.SmoothDampAngle(model.transform.rotation.eulerAngles.y, dir_angle,ref dirRotVel, 0.5f) , 0);
+        Vector3 modeldir = smoothedDirIndicator.localPosition;
         //animator2次元空間ブレンド向けの処理
         //モデルから見たdirの座標を取得
         Vector3 relate = model.transform.InverseTransformPoint(transform.position + direction * (noVerticalVelocity.magnitude / baseSpeed))/4;
@@ -92,12 +114,26 @@ public class TPSController : MonoBehaviour
         animator.SetFloat("Horizontal", relate.x * (1 + Input.GetAxis("RightTrigger")));
         animator.SetFloat("Vertical", relate.z * (1 + Input.GetAxis("RightTrigger")));
 
-        if (Input.GetAxis("LeftBumper") > 0.1)
+        animator.SetBool("RaiseToThrow", false);
+        //animator.SetBool("Shot", false);
+
+        //stateinfo = animator.GetCurrentAnimatorStateInfo(2);
+        //if (stateinfo.IsName("Shoot")) animator.SetBool("Shoot", false);
+        if (Input.GetAxis("LeftBumper") > 0.1f)
         {
-            ShotInput();
+            isRaiseToThrow = true;
+            animator.SetBool("RaiseToThrow", true);
+            OnRaiseToTHrow.Invoke();
         }
-        stateinfo = animator.GetCurrentAnimatorStateInfo(2);
-        if (stateinfo.IsName("Shot")) animator.SetBool("Shot", false);
+        else
+        {
+            if (isRaiseToThrow)
+            {
+                //Debug.Log("Throw");
+                ShotInput();
+            }
+            isRaiseToThrow = false;
+        }
 
         if (preShowCursor != showCursor)
         {
@@ -112,8 +148,17 @@ public class TPSController : MonoBehaviour
         return true;
         //return Physics.Raycast(transform.position + m_collider.bounds.center, -Vector3.up, distToGround + 0.1f);
     }
+
+    void TargetLook()
+    {
+        viewPointConstraint.weight = 1;
+        viewPointConstraint.constraintActive = true;
+    }
     void MouseLook()
     {
+        viewPointConstraint.weight = 0;
+        viewPointConstraint.constraintActive = false;
+
         showCursor = false;
         float mouseY = Input.GetAxis("LeftHoirizontal") * Time.deltaTime * 200 * Settings.MouseSensitivity;
         float mouseX = Input.GetAxis("LeftVertical") * Time.deltaTime * 200 * Settings.MouseSensitivity;
@@ -138,13 +183,23 @@ public class TPSController : MonoBehaviour
 
     void LocomotionInput()
     {
+
         inputHorizontal = Input.GetAxis("Horizontal");
         inputVertical = Input.GetAxis("Vertical");
+        if (Input.GetAxis("RightTrigger") > 0.1)
+        {
+            inputVertical = 1;
+            OnSprint.Invoke();
+        }
     }
 
     void Locomotion()
     {
-        
+
+        if (Input.GetAxis("RightTrigger") > 0.1)
+        {
+            OnSprint.Invoke();
+        }
 
         horizontalCam.position = Camera.main.transform.position;
 
@@ -162,7 +217,6 @@ public class TPSController : MonoBehaviour
         {
             //targetVelocity = preTargetVelocity;
         }
-
         Quaternion dirrot = Quaternion.LookRotation(targetVelocity);
         baseSpine.rotation = Quaternion.Euler(baseSpine.eulerAngles.x,dirrot.eulerAngles.y, baseSpine.eulerAngles.z);
         if (m_rigidbody.velocity.magnitude <= targetVelocity.magnitude)
@@ -178,12 +232,11 @@ public class TPSController : MonoBehaviour
         preTargetVelocity = targetVelocity;
 
         //Debug.Log(Input.GetAxis("RightTrigger"));
-        if (Input.GetAxis("RightTrigger") > 0.1)
-        {
-            OnSprint.Invoke();
-        }
-        //dirIndicator.position = transform.position;
-        //dirIndicator.position += velocity;
+
+        
+        dirIndicator.position = transform.position;
+        dirIndicator.position += direction;
+
         //transform.Translate(velocity * Time.deltaTime);
 
     }
@@ -198,7 +251,8 @@ public class TPSController : MonoBehaviour
 
     void ShotInput()
     {
-        animator.SetBool("Shot", true);
+        animator.SetBool("Shoot", true);
+        //animator.SetTrigger("Throw");
     }
 
     public void Shot()
@@ -207,6 +261,7 @@ public class TPSController : MonoBehaviour
         //bullet.position = shorOrigin.position;
         //bullet.rotation = shorOrigin.rotation;
         //bullet.GetComponent<projectile>().Throw();
+        animator.SetBool("Shoot", false);
         Ball.GetComponent<BallController>().Throw(shorOrigin.rotation);
     }
 

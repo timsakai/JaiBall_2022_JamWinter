@@ -47,7 +47,7 @@ public class BeatCircleManager : MonoBehaviour
                 beated = true;
             }
         }
-        if (beated) return 0;
+        if (beated) return 0;   
         return -1;
     }
     void Start()
