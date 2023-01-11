@@ -2,6 +2,7 @@ using Cinemachine.Utility;
 using Microsoft.Win32.SafeHandles;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Events;
@@ -11,7 +12,11 @@ public class TPSController : MonoBehaviour
 {
     [SerializeField] UnityEvent OnSprint = new UnityEvent();
     [SerializeField] UnityEvent OnRaiseToTHrow = new UnityEvent();
+    [SerializeField] UnityEvent OnShooting = new UnityEvent();
     [SerializeField] UnityEvent OnStandStill = new UnityEvent();
+    [SerializeField] UnityEvent OnChargeCharge = new UnityEvent();
+    [SerializeField] UnityEvent OnChargeStart = new UnityEvent();
+    [SerializeField] UnityEvent OnCharge = new UnityEvent();
 
     Rigidbody m_rigidbody;
     [SerializeField] Transform viewPoint;
@@ -36,8 +41,17 @@ public class TPSController : MonoBehaviour
     [SerializeField] float onJumpShootLavDisableTime;
     float jumpTime = 0f;
     bool isRaiseToThrow = false;
+    [SerializeField] float chargeSpeed;
+    [SerializeField] float chargeChargeTimeLength;
+    [SerializeField] float chargeCooldownTimeLength;
+    float chargeChargeTime = 0f;
+    float chargeTime = 0f;
+    bool isCharging = false;
+    bool isChargeChargeing = false;
     [SerializeField] GameObject bulletPrefab;
     Animator animator;
+    int shotIndex;
+    int shotAirIndex;
     //Vector3 dirRotVel = new Vector3();
     Vector3 velocity;
     Vector3 preTargetVelocity;
@@ -60,6 +74,8 @@ public class TPSController : MonoBehaviour
         m_collider = GetComponent<Collider>();
         horizontalCam = new GameObject("CamHorizontal").transform;
         animator = model.GetComponent<Animator>();
+        shotIndex = animator.GetLayerIndex("Shot");
+        shotAirIndex = animator.GetLayerIndex("ShotAir");
         distToGround = m_collider.bounds.extents.y;
         //Debug.Log(m_collider.bounds.center);
 
@@ -95,8 +111,56 @@ public class TPSController : MonoBehaviour
                     JumpInput();
                 }
             }
-            Locomotion();
+            if (!(isCharging || isChargeChargeing))
+            {
+                Locomotion();
+            }
 
+        }
+
+        if (Input.GetAxis("RightBumper") >= 0.1)
+        {
+            if (!isChargeChargeing)
+            {
+                isChargeChargeing = true;
+            }
+        }
+        if (isChargeChargeing)
+        {
+            chargeChargeTime += Time.deltaTime;
+            OnChargeCharge.Invoke();
+            animator.SetBool("ChargeChargeing", true);
+        }
+        else
+        {
+            chargeChargeTime = 0f;
+            animator.SetBool("ChargeChargeing", false);
+        }
+        if (chargeChargeTime >= chargeChargeTimeLength)
+        {
+            if (!isCharging)
+            {
+                Charge();
+                isChargeChargeing = false;
+            }
+            isCharging = true;
+        }
+        if (isCharging)
+        {
+            chargeTime += Time.deltaTime;
+            OnCharge.Invoke();
+        }
+        else
+        {
+            if (chargeTime != 0)
+            {
+                ChargeEnd();
+            }
+            chargeTime = 0;
+        }
+        if (chargeTime >= chargeCooldownTimeLength)
+        {
+            isCharging = false;
         }
 
         //AnimatorStateInfo stateinfo = animator.GetCurrentAnimatorStateInfo(1);
@@ -112,15 +176,21 @@ public class TPSController : MonoBehaviour
             {
                 animator.SetTrigger("JumpDown");
             }
+            animator.SetLayerWeight(shotAirIndex, 1);
+            animator.SetLayerWeight(shotIndex, 0);
             //RaycastHit hit;
             //if (Physics.Raycast(m_rigidbody.position,new Vector3(0,m_rigidbody.velocity.y,0),out hit, m_rigidbody.velocity.y,groundLayer))
             //{
-                
+
             //}
+
         }
         else
         {
             jumpTime = 0;
+
+            animator.SetLayerWeight(shotAirIndex, 0);
+            animator.SetLayerWeight(shotIndex, 1);
         }
 
         Vector3 noVerticalVelocity = m_rigidbody.velocity;
@@ -144,9 +214,8 @@ public class TPSController : MonoBehaviour
         animator.SetBool("RaiseToThrow", false);
         //animator.SetBool("Shot", false);
 
-        //stateinfo = animator.GetCurrentAnimatorStateInfo(2);
-        //if (stateinfo.IsName("Shoot")) animator.SetBool("Shoot", false);
-        m_rigidbody.drag = 0;
+        AnimatorStateInfo stateinfo = animator.GetCurrentAnimatorStateInfo(2);
+        if (stateinfo.IsName("Shoot")) OnShooting.Invoke();
         if (Input.GetAxis("LeftBumper") > 0.1f)
         {
             if (jumpTime >= onJumpShootLavDisableTime)
@@ -168,6 +237,7 @@ public class TPSController : MonoBehaviour
             {
                 //Debug.Log("Throw");
                 ShotInput();
+                m_rigidbody.drag = 0;
             }
             isRaiseToThrow = false;
         }
@@ -178,6 +248,12 @@ public class TPSController : MonoBehaviour
         }
         Cursor.lockState = CursorLockMode.Locked;
         preShowCursor = showCursor;
+    }
+
+    private void LateUpdate()
+    {
+
+        
     }
 
     bool IsGrounded()
@@ -315,6 +391,23 @@ public class TPSController : MonoBehaviour
         animator.SetTrigger("Dance");
     }
 
+    void Charge()
+    {
+        Debug.Log("Charge");
+        OnChargeStart.Invoke();
+        animator.SetTrigger("Charge");
+        Vector3 charge_dir = transform.rotation * transform.InverseTransformPoint(target.transform.position) - Vector3.up;
+        Debug.Log(charge_dir);
+        m_rigidbody.velocity = charge_dir.normalized * chargeSpeed + Vector3.up * 2;
+        m_rigidbody.drag = 3;
+        //m_rigidbody.AddForce(, ForceMode.VelocityChange);
+        //transform.Translate(charge_dir * chargeSpeed);
+    }
+
+    void ChargeEnd()
+    {
+        m_rigidbody.drag = 0;
+    }
     public void OnGround()
     {
         if (isFalling)
