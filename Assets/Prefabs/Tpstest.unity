@@ -28530,7 +28530,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6280961099779890063, guid: 05ef0364ddc4cd441a4f7d11df760c09, type: 3}
       propertyPath: stealCooltime
-      value: 1
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 6280961099779890063, guid: 05ef0364ddc4cd441a4f7d11df760c09, type: 3}
       propertyPath: ballHoldSocket
@@ -28963,6 +28963,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   freeze: 0
+  beatCircleManager: {fileID: 1089753145}
+  OnGood:
+    m_PersistentCalls:
+      m_Calls: []
+  OnBad:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &859787719
 GameObject:
   m_ObjectHideFlags: 0
@@ -39081,7 +39088,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6280961099779890063, guid: 05ef0364ddc4cd441a4f7d11df760c09, type: 3}
       propertyPath: stealCooltime
-      value: 1
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 6280961099779890063, guid: 05ef0364ddc4cd441a4f7d11df760c09, type: 3}
       propertyPath: ballHoldSocket

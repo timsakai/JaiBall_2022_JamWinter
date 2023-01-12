@@ -1,20 +1,43 @@
+using RootMotion.Demos;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class EnemyController : MonoBehaviour
 {
     [SerializeField] bool freeze = false;
+    [SerializeField] BeatCircleManager beatCircleManager;
+    [SerializeField] UnityEvent OnGood = new UnityEvent();
+    [SerializeField] UnityEvent OnBad = new UnityEvent();
+
+    TPSController tpsController;
     // Start is called before the first frame update
     void Start()
     {
-        
+        tpsController = GetComponent<TPSController>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+        if (!freeze)
+        {
+            if (tpsController.hasBall)
+            {
+                Vector3 relate = tpsController.viewPoint.InverseTransformPoint(tpsController.target.transform.position);
+                int beat = beatCircleManager.JudgeTiming(0.1f);
+                if (beat == 0)
+                {
+                    if (relate.z >= 8)
+                    {
+                        tpsController.Dance();
+                        OnGood.Invoke();
+                    }
+                }
+                
+            }
+        }
     }
 
     public void InputJump(TPSController controller)

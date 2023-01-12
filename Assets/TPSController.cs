@@ -30,7 +30,7 @@ public class TPSController : MonoBehaviour
     [SerializeField] UnityEvent OnChargeCharge = new UnityEvent();
     [SerializeField] UnityEvent OnChargeStart = new UnityEvent();
     [SerializeField] UnityEvent OnCharge = new UnityEvent();
-
+    [SerializeField] UnityEvent OnRereseBall = new UnityEvent();
     Rigidbody m_rigidbody;
     [SerializeField] public Transform viewPoint;
     AimConstraint viewPointConstraint;
@@ -76,6 +76,7 @@ public class TPSController : MonoBehaviour
     bool preShowCursor = true;
     [SerializeField] GameObject Ball;
     public bool hasBall { get; private set; }
+    bool PreHasBall = false;
     [SerializeField] bool hasBallDisplay;
 
     [SerializeField] bool targeting;
@@ -110,6 +111,7 @@ public class TPSController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (PreHasBall && !hasBall) OnRereseBall.Invoke();
         hasBallDisplay = hasBall;
         if (hasBall)
         {
@@ -311,7 +313,7 @@ public class TPSController : MonoBehaviour
     private void LateUpdate()
     {
 
-        
+        PreHasBall = hasBall;
     }
 
     bool IsGrounded()
