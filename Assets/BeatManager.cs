@@ -7,6 +7,7 @@ public class BeatManager : MonoBehaviour
 {
     [SerializeField] AudioSource BaseMusicAudioSource;
     public static AudioClip currentClip;
+    [SerializeField] TPSController observe;
     [SerializeField] UnityEvent OnGood = new UnityEvent();
     [SerializeField] UnityEvent OnBad = new UnityEvent();
 
@@ -39,28 +40,32 @@ public class BeatManager : MonoBehaviour
 
         cooltime += Time.deltaTime;
 
-        if (cooltime >= currentCoolTimeGoal)
+        if (observe.hasBall)
         {
-
-            if (Input.GetAxis("Beat0") > 0
-                || Input.GetAxis("Beat1") > 0
-                || Input.GetAxis("Beat2") > 0
-                || Input.GetAxis("Beat3") > 0)
+            if (cooltime >= currentCoolTimeGoal)
             {
-                cooltime = 0f;
-                int judge = beatCircleManager.JudgeTiming(goodThreshold);
-                if (judge <= -1)
+
+                if (Input.GetAxis("Beat0") > 0
+                    || Input.GetAxis("Beat1") > 0
+                    || Input.GetAxis("Beat2") > 0
+                    || Input.GetAxis("Beat3") > 0)
                 {
-                    OnBad.Invoke();
-                    currentCoolTimeGoal = badCoolTime;
-                }
-                else if (judge == 0)
-                {
-                    OnGood.Invoke();
-                    currentCoolTimeGoal = successCoolTime;
+                    cooltime = 0f;
+                    int judge = beatCircleManager.JudgeTiming(goodThreshold);
+                    if (judge <= -1)
+                    {
+                        OnBad.Invoke();
+                        currentCoolTimeGoal = badCoolTime;
+                    }
+                    else if (judge == 0)
+                    {
+                        OnGood.Invoke();
+                        currentCoolTimeGoal = successCoolTime;
+                    }
                 }
             }
         }
+        
     }
 
     private int JudgeInput()

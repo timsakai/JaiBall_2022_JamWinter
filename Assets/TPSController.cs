@@ -10,8 +10,21 @@ using Quaternion = UnityEngine.Quaternion;
 
 public class TPSController : MonoBehaviour
 {
+    [SerializeField] UnityEvent<TPSController> JumpInput = new UnityEvent<TPSController>();
+    [SerializeField] UnityEvent<TPSController> ChargeInput = new UnityEvent<TPSController>();
+    [SerializeField] UnityEvent<TPSController> ShootInput = new UnityEvent<TPSController>();
+    [SerializeField] UnityEvent<TPSController> SprintInput = new UnityEvent<TPSController>();
+    [SerializeField] UnityEvent<TPSController> LocomotionInput = new UnityEvent<TPSController>();
+
+    public float inputJump;
+    public float inputCharge;
+    public float inputShoot;
+    public float inputSprint;
+    public float inputHorizontal;
+    public float inputVertical;
+
     [SerializeField] UnityEvent OnSprint = new UnityEvent();
-    [SerializeField] UnityEvent OnRaiseToTHrow = new UnityEvent();
+    [SerializeField] UnityEvent OnRaiseToThrow = new UnityEvent();
     [SerializeField] UnityEvent OnShooting = new UnityEvent();
     [SerializeField] UnityEvent OnStandStill = new UnityEvent();
     [SerializeField] UnityEvent OnChargeCharge = new UnityEvent();
@@ -19,7 +32,7 @@ public class TPSController : MonoBehaviour
     [SerializeField] UnityEvent OnCharge = new UnityEvent();
 
     Rigidbody m_rigidbody;
-    [SerializeField] Transform viewPoint;
+    [SerializeField] public Transform viewPoint;
     AimConstraint viewPointConstraint;
     Transform horizontalCam;
     Vector2 polarViewCoord = new Vector2();
@@ -27,8 +40,6 @@ public class TPSController : MonoBehaviour
     [SerializeField] float turnSpeed;
     float turnTime = 0;
     float dirRotVel = 0;
-    float inputHorizontal;
-    float inputVertical;
     [SerializeField] float JumpSpeed = 10;
     bool isJumping = false;
     bool isFalling = true;
@@ -64,9 +75,17 @@ public class TPSController : MonoBehaviour
     [SerializeField] bool showCursor = true;
     bool preShowCursor = true;
     [SerializeField] GameObject Ball;
+    public bool hasBall { get; private set; }
+    [SerializeField] bool hasBallDisplay;
 
     [SerializeField] bool targeting;
     public GameObject target;
+
+    [SerializeField] Collider ballStealTrigger;
+    [SerializeField] Collider ballStolenTrigger;
+    [SerializeField] float stealCooltime = 1;
+    float stealTime = -1;
+    [SerializeField] public Transform ballHoldSocket;
     // Start is called before the first frame update
     void Start()
     {
@@ -84,11 +103,34 @@ public class TPSController : MonoBehaviour
         source.weight = 1;
         source.sourceTransform = target.transform;
         viewPointConstraint.SetSource(0, source);
+
+        hasBall = hasBallDisplay;
     }
 
     // Update is called once per frame
     void Update()
     {
+        hasBallDisplay = hasBall;
+        if (hasBall)
+        {
+            ballStolenTrigger.enabled = true;
+            ballStealTrigger.enabled = false;
+        }
+        else
+        {
+            ballStolenTrigger.enabled = false;
+            ballStealTrigger.enabled = true;
+        }
+        if (stealTime != -1)
+        {
+            stealTime += Time.deltaTime;
+        }
+        if (stealTime > stealCooltime)
+        {
+            ballStolenTrigger.enabled = false;
+            ballStealTrigger.enabled = false;
+            stealTime = -1;
+        }
         if (targeting)
         {
             TargetLook();
@@ -104,11 +146,25 @@ public class TPSController : MonoBehaviour
 
             if (!animator.GetCurrentAnimatorStateInfo(1).IsName("Dance"))
             {
-                LocomotionInput();
-
-                if (Input.GetAxis("LeftTrigger") > 0.1)
+                LocomotionInput.Invoke(this);
+                SprintInput.Invoke(this);
+                if (inputSprint > 0.1)
                 {
-                    JumpInput();
+                    inputVertical = 1;
+                    OnSprint.Invoke();
+                }
+                if (Mathf.Abs(inputHorizontal) <= 0.05f && Mathf.Abs(inputVertical) <= 0.05f)
+                {
+                    OnStandStill.Invoke();
+                }
+                JumpInput.Invoke(this);
+                //if (Input.GetAxis("LeftTrigger") > 0.1)
+                //{
+                //    JumpStart();
+                //}
+                if (inputJump > 0.1)
+                {
+                    JumpStart();
                 }
             }
             if (!(isCharging || isChargeChargeing))
@@ -118,9 +174,10 @@ public class TPSController : MonoBehaviour
 
         }
 
-        if (Input.GetAxis("RightBumper") >= 0.1)
+        ChargeInput.Invoke(this);
+        if (inputCharge >= 0.1)
         {
-            if (!isChargeChargeing)
+            if (!isChargeChargeing && !isCharging)
             {
                 isChargeChargeing = true;
             }
@@ -208,15 +265,16 @@ public class TPSController : MonoBehaviour
         //モデルから見たdirの座標を取得
         Vector3 relate = model.transform.InverseTransformPoint(transform.position + direction * (noVerticalVelocity.magnitude / baseSpeed))/4;
         //animatorに適用
-        animator.SetFloat("Horizontal", relate.x * (1 + Input.GetAxis("RightTrigger")));
-        animator.SetFloat("Vertical", relate.z * (1 + Input.GetAxis("RightTrigger")));
+        animator.SetFloat("Horizontal", relate.x * (1 + inputSprint));
+        animator.SetFloat("Vertical", relate.z * (1 + inputSprint));
 
         animator.SetBool("RaiseToThrow", false);
         //animator.SetBool("Shot", false);
 
         AnimatorStateInfo stateinfo = animator.GetCurrentAnimatorStateInfo(2);
         if (stateinfo.IsName("Shoot")) OnShooting.Invoke();
-        if (Input.GetAxis("LeftBumper") > 0.1f)
+        ShootInput.Invoke(this);
+        if (inputShoot > 0.1f)
         {
             if (jumpTime >= onJumpShootLavDisableTime)
             {
@@ -229,14 +287,14 @@ public class TPSController : MonoBehaviour
             //m_rigidbody.AddForce(Physics.gravity / 2 * Time.deltaTime, ForceMode.Force);
             isRaiseToThrow = true;
             animator.SetBool("RaiseToThrow", true);
-            OnRaiseToTHrow.Invoke();
+            OnRaiseToThrow.Invoke();
         }
         else
         {
             if (isRaiseToThrow)
             {
                 //Debug.Log("Throw");
-                ShotInput();
+                ShotStart();
                 m_rigidbody.drag = 0;
             }
             isRaiseToThrow = false;
@@ -294,29 +352,15 @@ public class TPSController : MonoBehaviour
 
     }
 
-    void LocomotionInput()
-    {
-
-        inputHorizontal = Input.GetAxis("Horizontal");
-        inputVertical = Input.GetAxis("Vertical");
-        if (Input.GetAxis("RightTrigger") > 0.1)
-        {
-            inputVertical = 1;
-            OnSprint.Invoke();
-        }
-        if (Mathf.Abs(inputHorizontal) <= 0.05f && Mathf.Abs(inputVertical) <= 0.05f)
-        {
-            OnStandStill.Invoke();
-        }
-    }
+    
 
     void Locomotion()
     {
 
-        if (Input.GetAxis("RightTrigger") > 0.1)
-        {
-            OnSprint.Invoke();
-        }
+        //if (inputSprint > 0.1)
+        //{
+        //    OnSprint.Invoke();
+        //}
 
         horizontalCam.position = Camera.main.transform.position;
 
@@ -357,25 +401,25 @@ public class TPSController : MonoBehaviour
         //transform.Translate(velocity * Time.deltaTime);
 
     }
-    void JumpInput()
+    public void JumpStart()
     {
         if (!isJumping) animator.SetTrigger("Jump");
         isJumping = true;
 
     }
-    public void Jump()
+    void Jump()
     {
         animator.ResetTrigger("Jump");
         m_rigidbody.AddForce(Vector3.up * JumpSpeed, ForceMode.Impulse);
     }
 
-    void ShotInput()
+    public void ShotStart()
     {
         animator.SetBool("Shoot", true);
         //animator.SetTrigger("Throw");
     }
 
-    public void Shot()
+    void Shot()
     {
         //Transform bullet = Instantiate(bulletPrefab).transform;
         //bullet.position = shorOrigin.position;
@@ -384,19 +428,19 @@ public class TPSController : MonoBehaviour
         //m_rigidbody.useGravity = true;
         animator.SetBool("Shoot", false);
         Ball.GetComponent<BallController>().Throw(shorOrigin.rotation);
+        hasBall = false;
     }
 
     public void Dance()
     {
         animator.SetTrigger("Dance");
     }
-
-    void Charge()
+    public void Charge()
     {
         Debug.Log("Charge");
         OnChargeStart.Invoke();
         animator.SetTrigger("Charge");
-        Vector3 charge_dir = transform.rotation * transform.InverseTransformPoint(target.transform.position) - Vector3.up;
+        Vector3 charge_dir = transform.rotation * transform.InverseTransformPoint(target.transform.position) - Vector3.up * 2;
         Debug.Log(charge_dir);
         m_rigidbody.velocity = charge_dir.normalized * chargeSpeed + Vector3.up * 2;
         m_rigidbody.drag = 3;
@@ -417,6 +461,24 @@ public class TPSController : MonoBehaviour
             Debug.Log("Ground!");
             isJumping = false;
             isFalling = false;
+        }
+    }
+
+    public void StealBall()
+    {
+        if (stealTime == -1)
+        {
+            hasBall = true;
+            stealTime = 0;
+        }
+    }
+
+    public void StolenBall()
+    {
+        if (stealTime == -1)
+        {
+            hasBall = false;
+            stealTime = 0;
         }
     }
 }
